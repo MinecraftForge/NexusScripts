@@ -1,0 +1,112 @@
+plugins {
+    id 'groovy'
+    id 'maven'
+    id 'eclipse'
+}
+
+group = 'net.minecraftforge.nexusscripts'
+version = '0.1'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+  mavenCentral()
+}
+ext.versions = [
+    nxrm3: '3.20.1-01'
+]
+
+dependencies {
+  implementation group: 'org.sonatype.nexus', name: 'nexus-core', version: versions.nxrm3
+  implementation group: 'org.sonatype.nexus', name: 'nexus-script', version: versions.nxrm3
+  implementation group: 'org.sonatype.nexus', name: 'nexus-security', version: versions.nxrm3
+  implementation group: 'org.sonatype.nexus', name: 'nexus-repository', version: versions.nxrm3
+  implementation group: 'org.sonatype.nexus.plugins', name: 'nexus-repository-maven', version: versions.nxrm3
+  implementation group: 'org.sonatype.nexus.plugins', name: 'nexus-script-plugin', version: versions.nxrm3
+}
+
+
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
+def getScriptList() {
+    def known = new HashSet()
+    new JsonSlurper().parseText(GET('/script')).each { script ->
+        known.add(script.get("name"))
+    }
+    return known
+}
+
+def addAuth(con) {
+    def account = project.properties.nexusAuth
+    con.addRequestProperty('Authorization', 'Basic: ' + Base64.encoder.encodeToString(account.bytes))
+    return con
+}
+
+def GET(url) {
+    def get = new URL(project.properties.nexusURL + url).openConnection()
+    get.requestMethod = 'GET'
+    addAuth(get)
+    return get.inputStream.text
+}
+
+def sendJson(url, method, data) {
+    def post = new URL(project.properties.nexusURL + url).openConnection()
+    addAuth(post)
+    post.requestMethod = method
+    post.doOutput = true
+    post.addRequestProperty('Content-Type', 'application/json')
+    post.outputStream.write(data.getBytes('UTF-8'))
+    return post.inputStream.text
+}
+
+task listScripts() {
+    doLast {
+        println getScriptList()
+    }
+}
+
+def uploadScript(known, name, path) {
+    def obj = [
+        name: name,
+        type: 'groovy',
+        content: path.text
+    ]
+    
+    def json = JsonOutput.toJson(obj)
+    
+    if (known.contains(name)) {
+        println 'Updating ' + name
+        println sendJson('/script/' + name, 'PUT', json)
+    } else {
+        println 'Creating ' + name
+        println sendJson('/script', 'POST', json)
+    }
+}
+
+task uploadScripts() {
+    doLast {
+        def known = getScriptList()
+        file('src/main/groovy').listFiles().each{ f ->
+            if (f.name.endsWith('.groovy')) {
+                def name = f.name.substring(0, f.name.length() - 7)
+                uploadScript(known, name, f)
+            }
+        }
+    }
+}
+
+task getMetadata() {
+    doLast {
+        def obj = [
+            repo: 'forge',
+            group: 'net.minecraftforge',
+            name: 'forge'
+        ]
+        def resp = new JsonSlurper().parseText(sendJson('/script/helloWorld/run', 'POST', JsonOutput.toJson(obj)))
+        def result = new JsonSlurper().parseText(resp['result'])
+        file('output.json').text = JsonOutput.prettyPrint(resp['result'])
+        println(result)
+    }
+}
