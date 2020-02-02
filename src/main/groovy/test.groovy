@@ -60,7 +60,7 @@ try {
         def ver = mvn.get('baseVersion')
         def classifier = mvn.get('classifier') == null ? '' : mvn.get('classifier')
         def modified = attribs.get('content').get('last_modified')
-
+        log.info("  Modified date: ${modified}")
         if (mvn.get('extension') != 'pom') {
             def version = versions.get(ver)
             if (version == null) {
