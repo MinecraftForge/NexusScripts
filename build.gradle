@@ -118,6 +118,15 @@ def getClassifiers(repo, group, name, version) {
     return new JsonSlurper().parseText(resp['result'])
 }
 
+task getVersions(dependsOn: uploadScripts) {
+    doLast {
+        def list = getVersions('forge', 'net.minecraftforge', 'forge')
+        def root = file('cache/net/minecraftforge/forge')
+        if (!root.exists()) root.mkdirs()
+        new File(root, 'versions.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(list))
+    }
+}
+
 task getMetadata(dependsOn: uploadScripts) {
     doLast {
         def list = getVersions('forge', 'net.minecraftforge', 'forge')

@@ -19,39 +19,55 @@ assert request.name: 'name parameter missing'
 
 log.info("Listing versions for ${request.group}:${request.name} in ${request.repo}")
 
-Repository repo = repository.repositoryManager.get(request.repo)
-StorageFacet storage = repo.facet(StorageFacet)
-StorageTx tx = storage.txSupplier().get()
-
-def prefix = request.group.replace('.', '/') + '/' + request.name + '/'
-
-def ret = [
-    spec: 1,
-    name: request.name,
-    group: request.group,
-    url: repo.url + '/' + prefix,
-    versions: []
-]
-
-//TODO: See if we can cache listClassifiers and include a checksum of some kind in this query.
-
-try {
-    tx.begin()
-
-    OCommandSQL cmd = new OCommandSQL(
-        'SELECT DISTINCT(attributes.maven2.baseVersion) as version ' +
-        'FROM asset ' +
-        'WHERE (' +
-            'attributes.maven2.groupId = :group ' +
-            'AND attributes.maven2.artifactId = :name' +
-        ')'
-    )
-    tx.db.command(cmd).execute([group: request.group, name: request.name]).each { row ->
-        ret.versions.add(row.field('version'))
-    }
-    ret.versions = ret.versions.sort()
-} finally {
-    tx.close()
+def toDict(row) {
+    def ret = [:]
+    row.fieldNames().each { ret[it] = row.field(it) }
+    return ret
 }
 
-return JsonOutput.prettyPrint(JsonOutput.toJson(ret))
+def main(request) {
+    Repository repo = repository.repositoryManager.get(request.repo)
+    StorageFacet storage = repo.facet(StorageFacet)
+    StorageTx tx = storage.txSupplier().get()
+
+    def dateFormat = new SimpleDateFormat('MM/DD/YY hh:mm:ss a')
+    def prefix = request.group.replace('.', '/') + '/' + request.name + '/'
+
+    def ret = [
+        spec: 0,
+        name: request.name,
+        group: request.group,
+        url: repo.url + '/' + prefix,
+        versions: [:]
+    ]
+
+    //TODO: See if we can cache listClassifiers and include a checksum of some kind in this query.
+
+    try {
+        tx.begin()
+
+        OCommandSQL cmd = new OCommandSQL(
+            'SELECT ' +
+              'DISTINCT(attributes.maven2.baseVersion) as version,' +
+              'MAX(attributes.content.last_modified) as modified ' +
+            ' ' +
+            'FROM asset ' +
+            'WHERE (' +
+                'attributes.maven2.groupId = :group ' +
+                'AND attributes.maven2.artifactId = :name' +
+            ') ' +
+            'GROUP BY attributes.maven2.baseVersion'
+        )
+        tx.db.command(cmd).execute([group: request.group, name: request.name]).each { row ->
+            row = toDict(row)
+            ret.versions[row.version] = dateFormat.format(row.modified)
+        }
+        ret.versions = ret.versions.sort()
+    } finally {
+        tx.close()
+    }
+
+    return JsonOutput.toJson(ret)
+}
+
+return main(request)
