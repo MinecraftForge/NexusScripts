@@ -97,16 +97,43 @@ task uploadScripts() {
     }
 }
 
-task getMetadata() {
+def getVersions(repo, group, name) {
+    def obj = [
+        'repo': repo,
+        'group': group,
+        'name': name
+    ]
+    def resp = new JsonSlurper().parseText(sendJson('/script/listVersions/run', 'POST', JsonOutput.toJson(obj)))
+    return new JsonSlurper().parseText(resp['result'])
+}
+
+def getClassifiers(repo, group, name, version) {
+    def obj = [
+        'repo': repo,
+        'group': group,
+        'name': name,
+        'version': version
+    ]
+    def resp = new JsonSlurper().parseText(sendJson('/script/listClassifiers/run', 'POST', JsonOutput.toJson(obj)))
+    return new JsonSlurper().parseText(resp['result'])
+}
+
+task getMetadata(dependsOn: uploadScripts) {
     doLast {
-        def obj = [
-            repo: 'forge',
-            group: 'net.minecraftforge',
-            name: 'forge'
-        ]
-        def resp = new JsonSlurper().parseText(sendJson('/script/helloWorld/run', 'POST', JsonOutput.toJson(obj)))
-        def result = new JsonSlurper().parseText(resp['result'])
-        file('output.json').text = JsonOutput.prettyPrint(resp['result'])
-        println(result)
+        def list = getVersions('forge', 'net.minecraftforge', 'forge')
+        def root = file('cache/net/minecraftforge/forge')
+        if (!root.exists()) root.mkdirs()
+        new File(root, 'versions.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(list))
+    
+        def ver_root = new File(root, 'versions')
+        if (!ver_root.exists()) ver_root.mkdirs()
+        
+        println('Downloading:')
+        for (def ver in list.versions) {
+            println(ver)
+            def classifiers = getClassifiers('forge', 'net.minecraftforge', 'forge', ver)
+            new File(ver_root, ver + '.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(classifiers))
+            break //This is only testing, so break after the first
+        }
     }
 }
