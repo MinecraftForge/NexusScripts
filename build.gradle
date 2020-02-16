@@ -162,7 +162,7 @@ def getTimes(root, repo, group, name) {
         'repo': 'forge',
         'paths': [:]
     ]
-    def format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    def format = new java.text.SimpleDateFormat('yyyy-MM-dd HH:mm:ss')
     def prefix = new File(root).absolutePath
     new File(root, group.replace('.', '/') + '/' + name).eachFileRecurse(groovy.io.FileType.FILES) { f ->
         def path = f.absolutePath.substring(prefix.length() + 1).replace('\\', '/')

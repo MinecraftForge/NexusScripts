@@ -40,7 +40,7 @@ def main(request) {
 
         OCommandSQL cmd = new OCommandSQL(
             'UPDATE asset ' +
-              'SET attributes.content.last_modified = :time ' +
+              'SET attributes.content.last_modified = DATE(:time) ' +
             ' ' +
             'WHERE (' +
                 'name = :path ' +
