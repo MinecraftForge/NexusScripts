@@ -146,3 +146,34 @@ task getMetadata(dependsOn: uploadScripts) {
         }
     }
 }
+
+task setTimestamps(dependsOn: uploadScripts) {
+    doLast {
+        def data = file('net.minecraftforge.forge.json').text
+        def resp = new JsonSlurper().parseText(sendJson('/script/setTimestamps/run', 'POST', data))
+        
+        file('ret.json').text = JsonOutput.prettyPrint(resp['result'])
+        print(JsonOutput.prettyPrint(resp['result']))
+    }
+}
+
+def getTimes(root, repo, group, name) {
+    def obj = [
+        'repo': 'forge',
+        'paths': [:]
+    ]
+    def format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    def prefix = new File(root).absolutePath
+    new File(root, group.replace('.', '/') + '/' + name).eachFileRecurse(groovy.io.FileType.FILES) { f ->
+        def path = f.absolutePath.substring(prefix.length() + 1).replace('\\', '/')
+        obj['paths'][path] = format.format(f.lastModified())
+    }
+    return obj
+}
+
+task buildTimestamps() {
+    doLast {
+        def data = getTimes('Z:/MAVEN_CLONE/', 'forge', 'net.minecraftforge', 'forge')
+        file('net.minecraftforge.forge.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(data))
+    }
+}
