@@ -30,7 +30,7 @@ def main(request) {
     StorageFacet storage = repo.facet(StorageFacet)
     StorageTx tx = storage.txSupplier().get()
 
-    def dateFormat = new SimpleDateFormat('MM/DD/YY hh:mm:ss a')
+    def dateFormat = new SimpleDateFormat('MM/dd/yy hh:mm:ss a')
     def prefix = request.group.replace('.', '/') + '/' + request.name + '/'
 
     def ret = [
